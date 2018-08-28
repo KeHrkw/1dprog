@@ -1,5 +1,5 @@
 SUBROUTINE ground_state()
-use CONSTANTS
+use CONSTANTS, only: Niter
   implicit none
   integer :: iter
   open(8,file="./output/log_base.dat")

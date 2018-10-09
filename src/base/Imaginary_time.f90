@@ -10,7 +10,7 @@ SUBROUTINE Imaginary_time_method()
   integer, save :: ik
   hav_old=0.d0
   rho_old=0.d0
-  do ik = -LNk, RNk, 1
+  do ik = 1, Nk, 1
     k_in=k(ik)
     do ib = 1, Nb, 1
       !Initial condition of wave function

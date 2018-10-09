@@ -2,14 +2,39 @@ SUBROUTINE Initialize()
   use CONSTANTS
   use WAVE_FUNC
   use TD_CALC
+  use COEFF
+  use FD_K
   implicit none
 
-  integer :: seedsize, is, ik, ix,ib
+  integer :: seedsize, is, ik, ix,ib,it
   integer, allocatable :: seed(:)
   real(8) :: tt, s
   real(8),dimension(:) :: fst(0:Nx-1)
+  !$ integer :: omp_get_max_threads
 
-  !Settings of randomnumber
+      NUMBER_THREADS=1
+  !$  NUMBER_THREADS=omp_get_max_threads()
+
+
+
+  allocate(phase(0:Nx-1,1:Nb,0:1))
+  allocate(pot(0:Nx-1))
+  allocate(zu_in(0:Nx-1,0:NUMBER_THREADS-1),hzu(0:Nx-1,0:NUMBER_THREADS-1),czu(0:Nx-1,0:NUMBER_THREADS-1))
+  allocate(k(1:Nk))
+  allocate(u(0:Nx-1,1:Nk,Nb),zu(0:Nx-1,1:Nk,Nbt))
+  allocate(hav_base(Nb))
+  allocate(zu_in_L(0:Nx-1,1-Nd_k:Nk+Nd_k,0:NUMBER_THREADS-1))
+  allocate(dk_zu(0:Nx-1,1:Nk,0:NUMBER_THREADS-1))
+
+  allocate(mask(0:Nt))
+  allocate(cur(1:Nbt,0:Nt),hav(1:Nbt,0:Nt),norm(1:Nbt,0:Nt))
+  allocate(Et(0:Nt),At(0:Nt))
+
+  allocate(Cnm(1:Nk,Nbt,Norb),Cnm_in(1-Nd_k:Nk+Nd_k,Norb))
+  allocate(HCnm(1:Nk,Norb),udku(1:Nk,Norb,Norb),udxu(1:Nk,Norb,Norb))
+  allocate(eps(1:Nk,Nb))
+
+
   call random_seed(size=seedsize)
   allocate(seed(seedsize))
   do is = 1, seedsize
@@ -18,7 +43,7 @@ SUBROUTINE Initialize()
   call random_seed(put=seed(:))
 
   !Initial condition of wave function
-  do ik = -LNk, RNk, 1
+  do ik = 1, Nk, 1
     do ib = 1, Nb, 1
       call random_number(fst)
       !do ix = Nx/2+1, Nx-1, 1
@@ -31,26 +56,9 @@ SUBROUTINE Initialize()
 
   !Settings of k-points
 
-  do ik = -LNk, RNk, 1
-    k(ik)=dk*real(ik)
+  do ik = 1, Nk, 1
+    k(ik)=-pi/width+(real(ik)-0.5d0)*dk
   end do
-
-  !dk_1=dk
-  !dk_2=dk*LNk_1/LNk_2
-
-  !do ik = -LNk, RNk, 1
-  !  if(ik <= LNk_1 .AND. ik >= -LNk_1) then
-  !    k(ik)=dk_1*real(ik)
-  !  else if ( (ik > LNk_1) .AND. (ik < LNk_1+LNk_2*(LNk_part-2)) ) then
-  !    k(ik)=dk_2*real(ik-LNk_1)+dk_1*real(LNk_1)
-  !  else if ( (ik < -LNk_1) .AND. (ik > -LNk_1-LNk_2*(LNk_part-2))) then
-  !    k(ik)=dk_2*real(ik+LNk_1)-dk_1*real(LNk_1)
-  !  else if ( (ik >= LNk_1+LNk_2*(LNk_part-2) )) then
-  !    k(ik)=dk_1*real(ik-LNk_1-LNk_2*(LNk_part-2))+dk_1*real(LNk_1)+dk_2*real(LNk_2*(LNk_part-2))
-  !  else if ( (ik <= -LNk_1-LNk_2*(LNk_part-2) )) then
-  !    k(ik)=dk_1*real(ik+LNk_1+LNk_2*(LNk_part-2))-dk_1*real(LNk_1)-dk_2*real(LNk_2*(LNk_part-2))
-  !  end if
-  !end do
 
 
   ! Create the mask function for electric-field and fourie transformation
@@ -64,7 +72,7 @@ SUBROUTINE Initialize()
     !Et(it) = E0*cos(omega*tt)*mask(it)
     !At(it) = E0*sin(omega*tt)*mask(it)/omega
     !Et = E0*mask(it)
-    Et(it)= E0*sin(omega*(tt-tau*pi/2.d0))*sin(tt/tau)**4
+    Et(it)= E0*sin(omega*(tt-tau*pi*0.5d0))*mask(it)
 
   end do
   do it = 0, Nt, 1
@@ -100,7 +108,7 @@ SUBROUTINE td_init()
   implicit none
   integer :: ib, ik
   do ib = 1, Nbt, 1
-    do ik = -LNk, RNk, 1
+    do ik = 1, Nk, 1
       zu(:,ik,ib)=u(:,ik,ib)
     end do
   end do

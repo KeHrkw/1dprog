@@ -6,7 +6,7 @@ SUBROUTINE FourieT()
   complex(kind(0d0)),dimension(:,:) :: ecur(Nbt,Ne)
   real(8) :: peak
   real(8) :: ee, tt, ss
-  integer :: ie, dw, ib, jb
+  integer :: ie, dw, ib, jb, it
 
   write(*,*)
   write(*,*) "Fourie Transform"
@@ -50,7 +50,7 @@ SUBROUTINE FourieT()
       do ie = (jb-1)*dw+1, (jb+1)*dw, 1
         peak = peak +abs(ecur(ib,ie))**2/ib*de
       end do
-      write(8,'(<2>i,<1>e)') ib,jb,peak
+      write(8,'(<2>i,<2>e)') ib,jb,jb*dw*de,peak
     end do
   write(8,*) ""
   write(8,*) ""

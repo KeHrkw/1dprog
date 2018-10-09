@@ -1,34 +1,77 @@
 SUBROUTINE ground_state()
-use CONSTANTS, only: Niter
+use CONSTANTS
+use WAVE_FUNC
+use COEFF, only : eps
   implicit none
-  integer :: iter
-  open(8,file="./output/log_base.dat")
-
+  integer :: iter,ik,ib
+  real(8),dimension(:) :: hav_base_old(Nb),cur(Nb)
+  open(8,file="./output/log_base.log")
+  hav_base_old(:)=0d0
   do iter = 1, Niter, 1
-    write(*,*) "---------------------------------"
+    write(*,*) "---------------------------------------"
     write(*,*) "iter=",iter
+
     call CG_method()
-    write(*,*) "---------------------------------"
+    !call CG_method_fix()
+
+    cur(:)=0d0
+    do ib = 1, Nb, 1
+      do ik = 1, Nk, 1
+        k_in=k(ik)
+        call zh_Velocity_operation(k_in,u(:,ik,ib),hzu(:,0))
+        call Current_Velocity_operation(k_in,u(:,ik,ib),czu(:,0))
+        cur(ib)=cur(ib)+real(sum(conjg(u(:,ik,ib))*czu(:,0))*dx)
+        eps(ik,ib)=real(sum(conjg(u(:,ik,ib))*hzu(:,0))*dx)
+      end do
+      hav_base(ib)=sum(eps(:,ib))/real(Nk)
+      cur(ib)=cur(ib)/real(Nk)
+    end do
+    write(*,*) "Energy of ik=1"
+    do ib=1,3
+      write(*,'(i,f11.6)',advance='no') ib,eps(1,ib)
+    end do
+    write(*,*)
+    write(*,*) "Current"
+    do ib=1,3
+      write(*,'(i,e11.4)',advance='no') ib,cur(ib)
+    end do
+    write(*,*)
+    write(*,*) "Total energy"
+    do ib=1,Nb
+      write(*,*) ib,hav_base(ib),hav_base(ib)-hav_base_old(ib)
+    end do
+    write(*,*) "---------------------------------------"
+    hav_base_old(:)=hav_base(:)
   end do
   close(8)
 
 end subroutine
 SUBROUTINE CG_method()
+  !$ use omp_lib
   use CONSTANTS
   use WAVE_FUNC
-  use COEFF, only : eps
   implicit none
-  complex(kind(0d0)),dimension(:) :: gk(0:Nx-1), pk(0:Nx-1), hpk(0:Nx-1), xk(0:Nx-1), hxk(0:Nx-1)
+  complex(8),dimension(:,:) :: gk(0:Nx-1,0:NUMBER_THREADS-1)
+  complex(8),dimension(:,:) :: pk(0:Nx-1,0:NUMBER_THREADS-1)
+  complex(8),dimension(:,:) :: hpk(0:Nx-1,0:NUMBER_THREADS-1)
+  complex(8),dimension(:,:) :: xk(0:Nx-1,0:NUMBER_THREADS-1)
+  complex(8),dimension(:,:) :: hxk(0:Nx-1,0:NUMBER_THREADS-1)
 
-  real(8) :: gkgk,pkpk,beta,ev,xkxk, xkHxk,pkHpk,R,s
+  real(8) :: gkgk,pkpk,beta,xkxk, xkHxk,pkHpk,R
   real(8) :: hav_old
-  complex(kind(0d0)) :: alpha,A,xkHpk,xkpk,B,Delta,C
+  complex(8) :: alpha,A,xkHpk,xkpk,B,Delta,C
   integer :: iscf, ib, jb, ik
+  integer :: thr_id
+  !$ double precision st, en
+  thr_id=0
 
+  !$ st = omp_get_wtime()
   write(8,*) "CG method"
   write(8,*) "ik,ib,iscf,(xkHxk/xkxk-hav_old)"
-  do ik = -LNk, RNk, 1
-    k_in=k(ik)
+  !$omp parallel private(thr_id)
+  !$ thr_id=omp_get_thread_num()
+  !$omp do private(ik,ib,jb,xkxk,xkHxk,hav_old,R,iscf,beta,gkgk,xkpk,pkpk,xkHpk,pkHpk,A,B,C,Delta,alpha)
+  do ik = 1, Nk, 1
     do ib = 1, Nb, 1
 
       !Gram-Schmidt process
@@ -38,41 +81,37 @@ SUBROUTINE CG_method()
 
 
       xkxk=sum(conjg(u(:,ik,ib))*u(:,ik,ib))*dx
-      xk(:)=u(:,ik,ib)/sqrt(xkxk)
+      xk(:,thr_id)=u(:,ik,ib)/sqrt(xkxk)
 
       !CG-method
-      u_in(0:Nx-1)=xk(0:Nx-1)
-      call h0_operation()
-      hxk(:)=hu(:)
-      xkHxk=sum(conjg(xk(:))*hxk(:))*dx
+      call zh_Velocity_operation(k(ik),xk(:,thr_id),hxk(:,thr_id))
+      xkHxk=sum(conjg(xk(:,thr_id))*hxk(:,thr_id))*dx
       hav_old=xkHxk
       R=xkHxk/xkxk
 
 
       do iscf = 1, Nscf, 1
 
-        gk(:)=2.d0*(hxk(:)-R*xk(:))/xkxk
+        gk(:,thr_id)=2.d0*(hxk(:,thr_id)-R*xk(:,thr_id))/xkxk
         !Gram-Schmidt process
         do jb = 1, ib-1, 1
-          gk(:)=gk(:)-u(:,ik,jb)*sum(conjg(u(:,ik,jb))*gk(:))*dx
+          gk(:,thr_id)=gk(:,thr_id)-u(:,ik,jb)*sum(conjg(u(:,ik,jb))*gk(:,thr_id))*dx
         end do
-        beta=sum(abs(gk(:))**2)*dx
+        beta=sum(abs(gk(:,thr_id))**2)*dx
         if(iscf==1)then
-          pk(:)=-gk(:)
+          pk(:,thr_id)=-gk(:,thr_id)
         else
-          pk(:)=-gk(:)+beta/gkgk*pk(:)
+          pk(:,thr_id)=-gk(:,thr_id)+beta/gkgk*pk(:,thr_id)
         end if
         gkgk=beta
 
-        xkpk=sum(conjg(xk(:))*pk(:))*dx
-        pkpk=sum(abs(pk(:))**2)*dx
+        xkpk=sum(conjg(xk(:,thr_id))*pk(:,thr_id))*dx
+        pkpk=sum(abs(pk(:,thr_id))**2)*dx
 
-        u_in(0:Nx-1)=pk(0:Nx-1)
-        call h0_operation()
-        hpk(:)=hu(:)
+        call zh_Velocity_operation(k(ik),pk(:,thr_id),hpk(:,thr_id))
 
-        pkHpk=sum(conjg(pk(:))*hpk(:))*dx
-        xkHpk=sum(conjg(xk(:))*hpk(:))*dx
+        pkHpk=sum(conjg(pk(:,thr_id))*hpk(:,thr_id))*dx
+        xkHpk=sum(conjg(xk(:,thr_id))*hpk(:,thr_id))*dx
 
         A=pkHpk*xkpk-xkHpk*pkpk
         B=pkHpk*xkxk-xkHxk*pkpk
@@ -90,16 +129,18 @@ SUBROUTINE CG_method()
           alpha=(-B+sqrt(real(Delta)))/(2.d0*A)
         end if
 
-        xk(:)=xk(:)+alpha*pk(:)
-        hxk(:)=hxk(:)+alpha*hpk(:)
+         xk(:,thr_id)= xk(:,thr_id)+alpha* pk(:,thr_id)
+        hxk(:,thr_id)=hxk(:,thr_id)+alpha*hpk(:,thr_id)
 
-        write(8,'(<3>i,<6>e)') ik,ib,iscf,xkxk,xkHxk,(R-hav_old),(gkgk*xkxk/(R**2)),Delta
+        write(8,'(<3>i,<6>e,i)') ik,ib,iscf,xkxk,xkHxk,(R-hav_old),(gkgk*xkxk/(R**2)),Delta,thr_id
 
-        if(gkgk*xkxk/(R**2)<4.d-15) exit
+        if(gkgk*xkxk/(R**2)<1.d-15) then
+          !write(*,*) ib,ik,"Converge"
+          exit
+        end if
 
-
-        xkHxk=sum(conjg(xk(:))*hxk(:))*dx
-        xkxk =sum(abs(xk(:))**2)*dx
+        xkHxk=sum(conjg(xk(:,thr_id))*hxk(:,thr_id))*dx
+        xkxk =sum(abs(xk(:,thr_id))**2)*dx
         R=xkHxk/xkxk
 
         !if(abs(R-hav_old) < 4.d-15) then
@@ -111,113 +152,97 @@ SUBROUTINE CG_method()
         hav_old=R
 
       end do
-      u(:,ik,ib)=xk(:)/sqrt(xkxk)
+      u(:,ik,ib)=xk(:,thr_id)/sqrt(xkxk)
     end do
   end do
-  do ib = 1, Nb, 1
-    do ik = -LNk, RNk, 1
-      k_in=k(ik)
-      u_in(0:Nx-1)=u(0:Nx-1,ik,ib)
-      call h0_operation()
-      eps(ik,ib)=real(sum(conjg(u(:,ik,ib))*hu(:))*dx)
-    end do
-    hav_base(ib)=sum(eps(:,ib))/real(Nk)
-  end do
-  write(*,*) "Energy of k=1"
-  write(*,*) eps(1,:)
-  write(*,*) "Total energy"
-  write(*,*) hav_base(:)
+  !$omp end do
+  !$omp end parallel
+
+  !$ en = omp_get_wtime()
+  !$ print *, "Elapsed time [sec]:", en-st
 END SUBROUTINE
 SUBROUTINE CG_method_fix()
+  !$ use omp_lib
   use CONSTANTS
   use WAVE_FUNC
   implicit none
-  !$omp threadprivate(u_in,hu,k_in)
-  complex(kind(0d0)),dimension(0:Nx-1) :: gk, pk, hpk, xk, hxk, pko
+  complex(8),dimension(:,:) :: gk(0:Nx-1,0:NUMBER_THREADS-1)
+  complex(8),dimension(:,:) :: pk(0:Nx-1,0:NUMBER_THREADS-1)
+  complex(8),dimension(:,:) :: hpk(0:Nx-1,0:NUMBER_THREADS-1)
+  complex(8),dimension(:,:) :: xk(0:Nx-1,0:NUMBER_THREADS-1)
+  complex(8),dimension(:,:) :: hxk(0:Nx-1,0:NUMBER_THREADS-1)
+  complex(8),dimension(:,:) :: pko(0:Nx-1,0:NUMBER_THREADS-1)
 
   real(8) :: gkgk,xkHxk,pkHpk,uk,s,ev
-  complex(kind(0d0)) :: xkHpk,xkpk,cx,cp,zs
-  integer :: iter, ib, jb, ik
-  real(8),parameter :: delta_cg=1.d-7
+  complex(8) :: xkHpk,xkpk,cx,cp,zs
+  integer :: iscf, ib, ibt, ik
+  real(8),parameter :: delta_cg=1.d-15
   real(8) :: hav_old
-  !write(8,*) "CG method"
-  !write(8,*) "ik,ib,iter,abs(alpha-hav_old),(gkgk/(xkHxk**2))"
-!$omp parallel
-!$omp do private(ik,ib,jb,s,zs,xkHxk,iter,uk,gkgk,xkHpk,pkHpk,cx,cp,hav_old,ev,xkpk,gk, pk, hpk, xk, hxk, pko)
-  do ik = -LNk, RNk, 1
+  integer :: thr_id
+  write(8,*) "CG method"
+  write(8,*) "ik,ib,iscf,xkHxk,abs(ev-xkHxk)"
+
+  thr_id=0
+!$omp parallel private(thr_id)
+!$  thr_id=omp_get_thread_num()
+!$omp do private(ib,ibt,s,xkHxk,iscf,uk,gkgk,xkHpk,pkHpk,ev,cx,cp,zs)
+  do ik=1,Nk
     k_in=k(ik)
-    do ib = 1, Nb, 1
-
-
-      do jb=1,ib-1
-        s=sum(conjg(u(:,ik,jb))*u(:,ik,ib))*dx
-        u(0:Nx-1,ik,ib)=u(0:Nx-1,ik,ib)-u(0:Nx-1,ik,jb)*s
-      end do
-      s=1.0d0/sqrt(sum(abs(u(:,ik,ib))**2)*dx)
-      xk(0:Nx-1)=u(0:Nx-1,ik,ib)*s
-
-      u_in(0:Nx-1)=xk(0:Nx-1)
-      call h0_operation()
-      hxk(0:Nx-1)=hu(0:Nx-1)
-
-      xkHxk=sum(conjg(xk(:))*hxk(:))*dx
-      hav_old=xkHxk
-      do iter=1,Niter
-
-        gk(0:Nx-1)=(hxk(0:Nx-1)-xkHxk*xk(0:Nx-1))
-        do jb=1,ib-1
-          zs=sum(conjg(u(:,ik,jb))*gk(:))*dx
-          gk(0:Nx-1)=gk(0:Nx-1)-u(0:Nx-1,ik,jb)*zs
-        end do
-        s=sum(abs(gk(:))**2)*dx
-
-        select case (iter)
-        case(1)
-          pk(0:Nx-1)=gk(0:Nx-1)
-        case default
-          uk=s/gkgk
-          pk(0:Nx-1)=gk(0:Nx-1)+uk*pk(0:Nx-1)
-        end select
-        gkgk=s
-
-        zs=sum(conjg(xk(:))*pk(:))*dx
-        pko(0:Nx-1)=pk(0:Nx-1)-xk(0:Nx-1)*zs
-        s=1.0d0/sqrt(sum(abs(pko(:))**2)*dx)
-        pko(0:Nx-1)=pko(0:Nx-1)*s
-
-        u_in(0:Nx-1)=pko(0:Nx-1)
-        call h0_operation()
-        hpk(0:Nx-1)=hu(0:Nx-1)
-
-        xkHpk=sum(conjg( xk(:))*hpk(:))*dx
-        pkHpk=sum(conjg(pko(:))*hpk(:))*dx
-        ev=0.5d0*((xkHxk+pkHpk)-sqrt((xkHxk-pkHpk)**2+4*abs(xkHpk)**2))
-        cx=xkHpk/(ev-xkHxk)
-        cp=1.d0/sqrt(1.d0+abs(cx)**2)
-        cx=cx*cp
-        if(abs(ev-xkHxk)<delta_cg) exit
-        if(iter==Niter) exit
-         xk(0:Nx-1)=cx* xk(0:Nx-1)+cp*  pko(0:Nx-1)
-        hxk(0:Nx-1)=cx*hxk(0:Nx-1)+cp*  hpk(0:Nx-1)
-
-        xkHxk=sum(conjg(xk(:))*hxk(:))*dx
-        write(8,'(<3>i,<2>e)') ik,ib,iter,abs(hav_old-xkHxk),abs(ev-xkHxk)
-        if(abs(hav_old-xkHxk)<delta_cg) exit
-      enddo
-
-        write(*,'(<3>i,<2>e)') ik,ib,iter,abs(hav_old-xkHxk),abs(ev-xkHxk)
-
-      s=1.0d0/sqrt(sum(abs(xk(:))**2)*dx)
-      u(0:Nx-1,ik,ib)=xk(0:Nx-1)*s
-
-      u_in(0:Nx-1)=u(0:Nx-1,ik,ib)
-      call h0_operation()
-
-      xkHxk=sum(conjg(u(:,ik,ib))*hu(:))*dx
-      write(*,*)
+  do ib=1,Nb
+    do ibt=1,ib-1
+      s=sum(conjg(u(:,ik,ibt))*u(:,ik,ib))*dx
+      u(0:Nx-1,ik,ib)=u(0:Nx-1,ik,ib)-u(0:Nx-1,ik,ibt)*s
     end do
-  end do
-  !$omp end parallel
+    s=1.0d0/sqrt(sum(abs(u(:,ik,ib))**2)*dx)
+    xk(0:Nx-1,thr_id)=u(0:Nx-1,ik,ib)*s
+
+    call zh_Velocity_operation(k_in,xk(:,thr_id),hxk(:,thr_id))
+
+    xkHxk=sum(conjg(xk(:,thr_id))*hxk(:,thr_id))*dx
+
+    do iscf=1,Nscf
+      gk(0:Nx-1,thr_id)=(hxk(0:Nx-1,thr_id)-xkHxk*xk(0:Nx-1,thr_id))
+      do ibt=1,ib-1
+        zs=sum(conjg(u(:,ik,ibt))*gk(:,thr_id))*dx
+        gk(0:Nx-1,thr_id)=gk(0:Nx-1,thr_id)-u(0:Nx-1,ik,ibt)*zs
+      end do
+      s=sum(abs(gk(:,thr_id))**2)*dx
+
+      select case (iscf)
+      case(1)
+        pk(0:Nx-1,thr_id)=gk(0:Nx-1,thr_id)
+      case default
+        uk=s/gkgk
+        pk(0:Nx-1,thr_id)=gk(0:Nx-1,thr_id)+uk*pk(0:Nx-1,thr_id)
+      end select
+      gkgk=s
+
+      zs=sum(conjg(xk(:,thr_id))*pk(:,thr_id))*dx
+      pko(0:Nx-1,thr_id)=pk(0:Nx-1,thr_id)-xk(0:Nx-1,thr_id)*zs
+      s=1.0d0/sqrt(sum(abs(pko(:,thr_id))**2)*dx)
+      pko(0:Nx-1,thr_id)=pko(0:Nx-1,thr_id)*s
+
+      call zh_Velocity_operation(k_in,pko(:,thr_id),hpk(:,thr_id))
+
+      xkHpk=sum(conjg( xk(:,thr_id))*hpk(:,thr_id))*dx
+      pkHpk=sum(conjg(pko(:,thr_id))*hpk(:,thr_id))*dx
+      ev=0.5d0*((xkHxk+pkHpk)-sqrt((xkHxk-pkHpk)**2+4*abs(xkHpk)**2))
+      cx=xkHpk/(ev-xkHxk)
+      cp=1.d0/sqrt(1.d0+abs(cx)**2)
+      cx=cx*cp
+
+      write(8,'(<3>i,<2>e)') ik,ib,iscf,xkHxk,abs(ev-xkHxk)
+      if(abs(ev-xkHxk)<delta_cg) exit
+       xk(0:Nx-1,thr_id)=cx* xk(0:Nx-1,thr_id)+cp*pko(0:Nx-1,thr_id)
+      hxk(0:Nx-1,thr_id)=cx*hxk(0:Nx-1,thr_id)+cp*hpk(0:Nx-1,thr_id)
+      xkHxk=sum(conjg(xk(:,thr_id))*hxk(:,thr_id))*dx
+    enddo
+
+    s=1.0d0/sqrt(sum(abs(xk(:,thr_id))**2)*dx)
+    u(0:Nx-1,ik,ib)=xk(0:Nx-1,thr_id)*s
+  enddo
+  enddo
+!$omp end parallel
 END SUBROUTINE
 SUBROUTINE simpson(x,y,zs)
   use CONSTANTS
@@ -254,7 +279,7 @@ Subroutine Gram_Schmidt_ompk()
   real(8) :: s
   complex(8) :: zov
 
-  do ik=-LNk,RNk
+  do ik=1,Nk
   do ib=1,Nb
     do ibt=1,ib-1
       zov=sum(conjg(u(:,ik,ibt))*u(:,ik,ib))*dx

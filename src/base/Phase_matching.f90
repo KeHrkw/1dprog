@@ -15,7 +15,7 @@ SUBROUTINE Phase_matching()
         iphase=ix
       end if
     end do
-    do ik = -LNk, RNk, 1
+    do ik = 1, Nk, 1
       uix=u(iphase,ik,ib)
       !write(8,'(<3>i,<2>e)') ib,iphase,ik,uix
       u(:,ik,ib)=u(:,ik,ib)/uix

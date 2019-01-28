@@ -42,8 +42,11 @@ SUBROUTINE Gauge_Velocity(it,At_in)
 
       end select
 
-
-
+      if(it==Nt) then
+        k_in=k(ik)
+      else
+        k_in=k(ik)+At(it+1)
+      end if
       call zh_Velocity_operation(k_in,zu(:,ik,ib),hzu(:,thr_id))
       call Current_Velocity_operation(k_in,zu(:,ik,ib),czu(:,thr_id))
 

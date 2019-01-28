@@ -4,11 +4,17 @@
           Nb=3,
           Niter=120,
           Nscf=5,
-          E0_in=1.65d0,
-          lambda_in=3200d0,
-          tau_in=99.66d0,
+          rlaser_int_wcm2=5d0,
+          lambda_in=640d0,
+          tau_in=441.195d0,
+          Nt=3000,
           Nbt=2,
           Nexp=4,
-          dt=0.011d0,
+          dt=0.16d0,
           de=0.002d0,
           Ne=5000 /
+&potential ipot=1,
+            width=8d0,
+            a0=1d0
+            V0=-0.7d0 /
+            

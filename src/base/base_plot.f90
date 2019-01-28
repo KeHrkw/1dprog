@@ -2,6 +2,7 @@ SUBROUTINE base_plot()
   use CONSTANTS
   use WAVE_FUNC
   use COEFF
+  use FD_K, only:isplot
   implicit none
   integer :: ik, ix, ik_min, ik_max
   integer :: jb, ib
@@ -28,7 +29,7 @@ SUBROUTINE base_plot()
       write(*,*) "  ik_min =",ik_min,"    en_min =",en_min
   end do
 
-  open(11,file='./output/base.dat')
+  open(11,file='./base.data')
   do ib = 1, Nb, 1
     do ik = 1, Nk, 1
       write(11,'(<2>i,<2>e)') ib,ik,k(ik),eps(ik,ib)
@@ -37,7 +38,7 @@ SUBROUTINE base_plot()
     write(11,*)
   end do
   close(11)
-  open(11,file='./output/bphi.dat')
+  open(11,file='./bphi.data')
   do ix = 0, Nx-1, 1
     write(11,'(<2>i,<1>e)') 0, ix, pot(ix)
   end do
@@ -51,7 +52,7 @@ SUBROUTINE base_plot()
     write(11,*) ""
   end do
   close(11)
-  open(11,file='./output/bphi_k.dat')
+  open(11,file='./bphi_k.data')
   do ib = 1, Nb, 1
     do ik = 1, Nk, 1
       do ix = 0, Nx-1, 1
@@ -63,7 +64,8 @@ SUBROUTINE base_plot()
   end do
   close(11)
 
-  open(11,file='./output/sp_bphi.dat')
+  if( isplot==1 )then
+  open(11,file='./sp_bphi.data')
   do ib = 1, Nb, 1
     do ix = 0, Nx-1, 1
       do ik = -Nk+1, 0, 1
@@ -83,4 +85,5 @@ SUBROUTINE base_plot()
     write(11,*)
   end do
   close(11)
+  end if
 END SUBROUTINE

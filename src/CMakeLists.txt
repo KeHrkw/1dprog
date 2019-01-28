@@ -4,15 +4,18 @@ cmake_minimum_required(VERSION 2.8)
 message(STATUS "CMAKE_SOURCE_DIR = ${CMAKE_SOURCE_DIR}")
 message(STATUS "CMAKE_CURRENT_BINARY_DIR = ${CMAKE_CURRENT_BINARY_DIR}")
 ### Project settings
-project(SALMON Fortran C)
+project(SALMON Fortran)
 
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/output")
-message(STATUS "MAKE_DIRECTORY : ${CMAKE_CURRENT_BINARY_DIR}/output")
+#file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/output")
+#message(STATUS "MAKE_DIRECTORY : ${CMAKE_CURRENT_BINARY_DIR}/output")
 
 set(CMAKE_VERBOSE_MAKEFILE None)
 message(STATUS "CMAKE_VERBOSE_MAKEFILE = ${CMAKE_VERBOSE_MAKEFILE}")
 
+
+message(STATUS "${CMAKE_Fortran_COMPILER}")
 set(CMAKE_Fortran_COMPILER ifort)
+message(STATUS "${CMAKE_Fortran_COMPILER}")
 
 option(IF_LOW OFF)
 message(STATUS "IF_LOW = ${IF_LOW}")
@@ -27,13 +30,6 @@ set(CMAKE_Fortran_FLAGS_DEBUG "-fpp -CB -traceback -g")
 message(STATUS "Fortran_Flag_Debug = ${CMAKE_Fortran_FLAGS_DEBUG}")
 message(STATUS "Fortran_Flag_Release = ${CMAKE_Fortran_FLAGS_RELEASE}")
 
-option(Debug OFF)
-message(STATUS "Debug = ${Debug}")
-if(Debug)
-set(CMAKE_BUILD_TYPE Debug)
-else()
-set(CMAKE_BUILD_TYPE Release)
-endif()
 message(STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}")
 
 set(sources main.f90 FourieT.f90 Initialize.f90 Module.f90 gnuplot.f90 input.f90)

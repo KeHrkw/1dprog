@@ -29,6 +29,7 @@ SUBROUTINE Initialize()
   allocate(mask(0:Nt))
   allocate(cur(1:Nbt,0:Nt),hav(1:Nbt,0:Nt),norm(1:Nbt,0:Nt))
   allocate(Et(0:Nt),At(0:Nt))
+  allocate(fEj(0:Nt),cc(0:Nt))
 
   allocate(Cnm(1:Nk,Nbt,Norb),Cnm_in(1-Nd_k:Nk+Nd_k,Norb))
   allocate(HCnm(1:Nk,Norb),udku(1:Nk,Norb,Norb),udxu(1:Nk,Norb,Norb))
@@ -63,16 +64,19 @@ SUBROUTINE Initialize()
 
   ! Create the mask function for electric-field and fourie transformation
   do it = 0, Nt, 1
-    tt=real(it)*dt
-    mask(it)=sin(tt/tau)**4
-
-
+    !tt=real(it)*dt
+    tt=real(it)*dt-0.5d0*tau
+    !mask(it)=sin(tt/tau)**4
+    if(abs(tt)<0.5d0*tau) then
+      mask(it)=cos(pi*tt/tau)**2
+      At(it)=-E0/omega*sin(omega*tt)*mask(it)
+    end if
 
     !Electric field
     !Et(it) = E0*cos(omega*tt)*mask(it)
     !At(it) = E0*sin(omega*tt)*mask(it)/omega
     !Et = E0*mask(it)
-    Et(it)= E0*sin(omega*(tt-tau*pi*0.5d0))*mask(it)
+    !Et(it)= E0*sin(omega*(tt-tau*pi*0.5d0))*mask(it)
 
   end do
   do it = 0, Nt, 1
@@ -80,16 +84,20 @@ SUBROUTINE Initialize()
       At(it)=0
       Et(it)=0
     else
-      At(it)=-(sum(Et(0:it-1))+Et(it)*0.5d0)*dt
-      !Et(it)=-(At(it+1)-At(it-1))/(2.d0*dt)
+      !At(it)=-(sum(Et(0:it-1))+Et(it)*0.5d0)*dt
+      Et(it)=-(At(it+1)-At(it-1))/(2.d0*dt)
     end if
   end do
 
 
   !Create the potential
   do ix=0,Nx-1
-    !pot(ix) = V0 * (exp(-((ix*dx-width/2.d0)/a0)**2) + exp(-((ix*dx-width*3.d0/2.d0)/a0)**2) + exp(-((ix*dx+width/2.d0)/a0)**2)  )
-    pot(ix) = V0*(1+cos(2*pi*ix*dx/width))
+    select case(ipot)
+    case(1)
+      pot(ix) = V0*(exp(-((ix*dx-width/2.d0)/a0)**2) + exp(-((ix*dx-width*3.d0/2.d0)/a0)**2) + exp(-((ix*dx+width/2.d0)/a0)**2)  )
+    case(2)
+      pot(ix) = V0*(1+cos(2*pi*ix*dx/width))
+    end select
   end do
 !  pot(:)=0.d0
 

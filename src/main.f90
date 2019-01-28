@@ -26,7 +26,7 @@ PROGRAM Bloch
 
   call Initialize()
 
-  !$ write(*,*)"Nthreads : ",NUMBER_THREADS
+  write(*,*)"Nthreads : ",NUMBER_THREADS
   write(*,*) "dx : ",dx
   write(*,*) "dt : ",dt
   write(*,*) "dk : ",dk
@@ -67,7 +67,9 @@ PROGRAM Bloch
 
 
   !$ st = omp_get_wtime()
+
   write(*,*)
+  write(*,*) "---------------------------------------"
   write(*,*) "Time Development"
   write(*,*)
   write(*,*)"Nt : ",Nt
@@ -77,6 +79,9 @@ PROGRAM Bloch
   !write(*,*)"Tad : ",Tad
   write(*,*) "Nexp : ", Nexp
   write(*,*) "Nbt : ", Nbt
+
+  write(*,*) "---------------------------------------"
+  write(*,*)  "         it      ","     norm      ","               Eall      ","                cur"
 
   norm(:,:)=0.d0
    cur(:,:)=0.d0
@@ -94,32 +99,38 @@ PROGRAM Bloch
     end select
 
 
-    if(mod(it,5000)==0 .OR. it==(Nt) )then
-       write(*,'(<1>i,<1>e)') it,sum(norm(:,it))
+
+    if(mod(it,1000)==0 .OR. it==(Nt) )then
+       write(*,'(<1>i,<3>e)') it,sum(norm(:,it)),sum(hav(:,it)),sum(cur(:,it))
     end if
   end do
+  write(*,*) "---------------------------------------"
   !$ en = omp_get_wtime()
   !$ print *, "Elapsed time [sec]:", en-st
+
 
   write(*,*) "Excitation Energy :"
   do ib = 1, Nbt, 1
     write(*,'(<1>i,<1>e)') ib ,(hav(ib,(Nt))-hav_base(ib))
   end do
-  open(8,file="./output/td.dat")
+  open(8,file="./td.data")
+  write(8,*) "#it, it*dt,norm,cur(1:3),hav(1:3),Et,At"
+  do it = 0, (Nt), 1
+    write(8,'(<1>i,<1>e)',advance='no') it, it*dt
+    write(8,'(<1>e)',advance='no') sum(norm(:,it))
+    write(8,'(<3>e)',advance='no') cur(1,it), sum(cur(1:2,it))/2d0, sum(cur(1:Nbt,it))/real(Nbt)
+    write(8,'(<3>e)',advance='no') hav(1,it), sum(hav(1:2,it))/2d0, sum(hav(1:Nbt,it))/real(Nbt)
+    write(8,'(<2>e)',advance='no') Et(it),At(it)
+    write(8,*)
+  end do
+  close(8)
+  open(8,file="./td_exe.data")
   do it=0,Nt
-    write(8,'(<1>i,<4>e)') it,real(it)*dt,norm(:,it)
+    cc(it)=sum(cur(:,it))/real(Nbt)
+    fEj(it)=abs(sum(Et(0:it-1)*cc(0:it-1))+Et(it)*cc(it)*0.5d0)*dt
+    write(8,'(<3>e)',advance='yes') real(it)*dt,fEj(it),(sum(hav(1:Nbt,it))/real(Nbt)-sum(hav(1:Nbt,0))/real(Nbt))
   end do
-  close(8)
-  open(8,file="./output/td_V.dat")
-  write(8,*) "it, it*dt,(cur(ib,it)),sum(cur(1:ib,it)),hav(ib,it),sum(hav(1:ib,it)),Et(it),At(it)"
-  do ib = 1, Nbt, 1
-    do it = 0, (Nt), 1
-      write(8,'(<1>i,<8>e)') it, it*dt,(cur(ib,it)),sum(cur(1:ib,it)),hav(ib,it),sum(hav(1:ib,it)),Et(it),At(it)
-    end do
-    write(8,*)""
-    write(8,*)""
-  end do
-  close(8)
+  close (8)
 
 
   !Fourie transformation
@@ -129,7 +140,7 @@ PROGRAM Bloch
   !$ print *, "Elapsed time [sec]:", en-st
 
   call gnuplot()
-
+  write(*,*) "---------------------------------------"
   write(*,*)"finish!"
 
 END PROGRAM

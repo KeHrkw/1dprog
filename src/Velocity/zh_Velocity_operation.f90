@@ -3,7 +3,9 @@ SUBROUTINE zh_Velocity_operation(kAc,A,B)
   implicit none
   integer :: ix
   !complex(kind(0d0)) :: dif, dif2
+
 # define IDX(dt) modx(ix+(dt)+Nx)
+
   complex(8),dimension(0:Nx-1),intent(in)  :: A
   complex(8),dimension(0:Nx-1),intent(out) :: B
   real(8),intent(in)    :: kAc

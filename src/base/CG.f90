@@ -5,7 +5,7 @@ use COEFF, only : eps
   implicit none
   integer :: iter,ik,ib
   real(8),dimension(:) :: hav_base_old(Nb),cur(Nb)
-  open(8,file="./output/log_base.log")
+  !open(8,file="./log_base.log")
   hav_base_old(:)=0d0
   do iter = 1, Niter, 1
     write(*,*) "---------------------------------------"
@@ -43,7 +43,7 @@ use COEFF, only : eps
     write(*,*) "---------------------------------------"
     hav_base_old(:)=hav_base(:)
   end do
-  close(8)
+  !close(8)
 
 end subroutine
 SUBROUTINE CG_method()
@@ -66,8 +66,8 @@ SUBROUTINE CG_method()
   thr_id=0
 
   !$ st = omp_get_wtime()
-  write(8,*) "CG method"
-  write(8,*) "ik,ib,iscf,(xkHxk/xkxk-hav_old)"
+  !write(8,*) "CG method"
+  !write(8,*) "ik,ib,iscf,(xkHxk/xkxk-hav_old)"
   !$omp parallel private(thr_id)
   !$ thr_id=omp_get_thread_num()
   !$omp do private(ik,ib,jb,xkxk,xkHxk,hav_old,R,iscf,beta,gkgk,xkpk,pkpk,xkHpk,pkHpk,A,B,C,Delta,alpha)
@@ -132,9 +132,9 @@ SUBROUTINE CG_method()
          xk(:,thr_id)= xk(:,thr_id)+alpha* pk(:,thr_id)
         hxk(:,thr_id)=hxk(:,thr_id)+alpha*hpk(:,thr_id)
 
-        write(8,'(<3>i,<6>e,i)') ik,ib,iscf,xkxk,xkHxk,(R-hav_old),(gkgk*xkxk/(R**2)),Delta,thr_id
+        !write(8,'(<3>i,<6>e,i)') ik,ib,iscf,xkxk,xkHxk,(R-hav_old),(gkgk*xkxk/(R**2)),Delta,thr_id
 
-        if(gkgk*xkxk/(R**2)<1.d-15) then
+        if(gkgk*xkxk/(R**2)<4.d-16) then
           !write(*,*) ib,ik,"Converge"
           exit
         end if
@@ -179,8 +179,8 @@ SUBROUTINE CG_method_fix()
   real(8),parameter :: delta_cg=1.d-15
   real(8) :: hav_old
   integer :: thr_id
-  write(8,*) "CG method"
-  write(8,*) "ik,ib,iscf,xkHxk,abs(ev-xkHxk)"
+  !write(8,*) "CG method"
+  !write(8,*) "ik,ib,iscf,xkHxk,abs(ev-xkHxk)"
 
   thr_id=0
 !$omp parallel private(thr_id)
@@ -231,7 +231,7 @@ SUBROUTINE CG_method_fix()
       cp=1.d0/sqrt(1.d0+abs(cx)**2)
       cx=cx*cp
 
-      write(8,'(<3>i,<2>e)') ik,ib,iscf,xkHxk,abs(ev-xkHxk)
+      !write(8,'(<3>i,<2>e)') ik,ib,iscf,xkHxk,abs(ev-xkHxk)
       if(abs(ev-xkHxk)<delta_cg) exit
        xk(0:Nx-1,thr_id)=cx* xk(0:Nx-1,thr_id)+cp*pko(0:Nx-1,thr_id)
       hxk(0:Nx-1,thr_id)=cx*hxk(0:Nx-1,thr_id)+cp*hpk(0:Nx-1,thr_id)

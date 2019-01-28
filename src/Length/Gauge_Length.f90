@@ -33,7 +33,10 @@ SUBROUTINE Gauge_Length(it,Et_in)
       do iexp=1,Nexp,1
         zcoef=zcoef*(-zI)*dt/iexp
 
-        call dev_k(ib,zu_in_L(:,:,thr_id),dk_zu(:,:,thr_id))
+        !call dev_k(ib,zu_in_L(:,:,thr_id),dk_zu(:,:,thr_id))
+        do ix=0,Nx-1
+          call diff_kz(phase(ix,ib,0:1),zu_in_L(ix,1:Nk,thr_id),dk_zu(ix,1:Nk,thr_id))
+        end do
 
         do ik = 1, Nk
           k_in=k(ik)
@@ -44,12 +47,12 @@ SUBROUTINE Gauge_Length(it,Et_in)
       end do
     end select
 
-    call dev_k(ib,zu(:,:,ib),dk_zu(:,:,thr_id))
+    !call dev_k(ib,zu(:,:,ib),dk_zu(:,:,thr_id))
 
     do ik=1,Nk
       k_in=k(ik)
       call zh_Velocity_operation(k_in,zu(:,ik,ib),hzu(:,thr_id))
-      hzu(:,thr_id)=hzu(:,thr_id)+zI*Et_in*dk_zu(:,ik,thr_id)
+      !hzu(:,thr_id)=hzu(:,thr_id)+zI*Et_in*dk_zu(:,ik,thr_id)
 
       call Current_Velocity_operation(k_in,zu(:,ik,ib),czu(:,thr_id))
 
@@ -67,40 +70,62 @@ SUBROUTINE Gauge_Length(it,Et_in)
      hav(ib,it)=sum(hav_v(:,ib))/real(Nk)
      cur(ib,it)=sum(cur_v(:,ib))/real(Nk)
   end do
-
+contains
+  subroutine diff_kz(phase,tpsi_in,dktpsi)
+      implicit none
+      complex(8),intent(in)   ::   phase(0:1)
+      complex(8),intent(in)   :: tpsi_in(1:NK)
+      complex(8),intent(out)  ::  dktpsi(1:NK)
+      complex(8) :: tpsi(1-Nd_k:NK+Nd_k)
+      integer :: ik,i
+      dktpsi(:)=0.d0
+      tpsi(1:NK)=tpsi_in(1:NK)
+      do i=1,Nd_k
+        tpsi(  1-i)=phase(0)*tpsi(NK-i+1)
+        tpsi(NK+i)=phase(1)*tpsi(i)
+      end do
+      do ik=1,NK
+      do i=1,Nd_k
+        dktpsi(ik)=dktpsi(ik)+nab_k(i)*(tpsi(ik+i)-tpsi(ik-i))
+      end do
+      end do
+  end subroutine
 END SUBROUTINE
-SUBROUTINE dev_k(ib,A,B)
-  use CONSTANTS
-  use FD_K
-  implicit none
-  complex(8),dimension(0:Nx-1,1:Nk),intent(in)  :: A
-  complex(8),dimension(0:Nx-1,1:Nk),intent(out) :: B
-  complex(8),dimension(0:Nx-1,1-Nd_k:Nk+Nd_k) :: zu_L
-  integer,intent(in) :: ib
-  integer :: ik,ix
-  do ix = 0, Nx-1, 1
-    zu_L(ix,1:Nk)=A(ix,1:Nk)
-    zu_L(ix, 0)=phase(ix,ib,0)*A(ix,Nk)
-    zu_L(ix,-1)=phase(ix,ib,0)*A(ix,Nk-1)
-    zu_L(ix,-2)=phase(ix,ib,0)*A(ix,Nk-2)
-    zu_L(ix,-3)=phase(ix,ib,0)*A(ix,Nk-3)
-    zu_L(ix,-4)=phase(ix,ib,0)*A(ix,Nk-4)
-    zu_L(ix,Nk+1) =phase(ix,ib,1)*A(ix,1)
-    zu_L(ix,Nk+2) =phase(ix,ib,1)*A(ix,2)
-    zu_L(ix,Nk+3) =phase(ix,ib,1)*A(ix,3)
-    zu_L(ix,Nk+4) =phase(ix,ib,1)*A(ix,4)
-    zu_L(ix,Nk+5) =phase(ix,ib,1)*A(ix,5)
-  end do
+!SUBROUTINE dev_k(ib,A,B)
+!  use CONSTANTS
+!  use FD_K
+!  implicit none
+!  complex(8),dimension(0:Nx-1,1:Nk),intent(in)  :: A
+!  complex(8),dimension(0:Nx-1,1:Nk),intent(out) :: B
+!  complex(8),dimension(0:Nx-1,1-Nd_k:Nk+Nd_k) :: zu_L
+!  integer,intent(in) :: ib
+!  integer :: ik,ix
+!  do ix = 0, Nx-1, 1
+!    zu_L(ix,1:Nk)=A(ix,1:Nk)
+!    zu_L(ix, 0)=phase(ix,ib,0)*A(ix,Nk)
+!    zu_L(ix,-1)=phase(ix,ib,0)*A(ix,Nk-1)
+!    zu_L(ix,-2)=phase(ix,ib,0)*A(ix,Nk-2)
+!    zu_L(ix,-3)=phase(ix,ib,0)*A(ix,Nk-3)
+!    zu_L(ix,-4)=phase(ix,ib,0)*A(ix,Nk-4)
+!    zu_L(ix,-5)=phase(ix,ib,0)*A(ix,Nk-5)
+!    zu_L(ix,Nk+1) =phase(ix,ib,1)*A(ix,1)
+!    zu_L(ix,Nk+2) =phase(ix,ib,1)*A(ix,2)
+!    zu_L(ix,Nk+3) =phase(ix,ib,1)*A(ix,3)
+!    zu_L(ix,Nk+4) =phase(ix,ib,1)*A(ix,4)
+!    zu_L(ix,Nk+5) =phase(ix,ib,1)*A(ix,5)
+!    zu_L(ix,Nk+6) =phase(ix,ib,1)*A(ix,6)
+!  end do
 
-  do ik = 1, Nk, 1
-    do ix = 0, Nx-1, 1
-      B(ix,ik) = (nab_k(1)*(zu_L(ix,ik+1)-zu_L(ix,ik-1)) &
-      &              + nab_k(2)*(zu_L(ix,ik+2)-zu_L(ix,ik-2)) &
-      &              + nab_k(3)*(zu_L(ix,ik+3)-zu_L(ix,ik-3)) &
-      &              + nab_k(4)*(zu_L(ix,ik+4)-zu_L(ix,ik-4)) &
-      &              + nab_k(5)*(zu_L(ix,ik+5)-zu_L(ix,ik-5)))
-    end do
-  end do
-
-  return
-END SUBROUTINE dev_k
+!  do ik = 1, Nk, 1
+!    do ix = 0, Nx-1, 1
+!      B(ix,ik) = (nab_k(1)*(zu_L(ix,ik+1)-zu_L(ix,ik-1)) &
+!      &              + nab_k(2)*(zu_L(ix,ik+2)-zu_L(ix,ik-2)) &
+!      &              + nab_k(3)*(zu_L(ix,ik+3)-zu_L(ix,ik-3)) &
+!      &              + nab_k(4)*(zu_L(ix,ik+4)-zu_L(ix,ik-4)) &
+!      &              + nab_k(5)*(zu_L(ix,ik+5)-zu_L(ix,ik-5)) &
+!      &              + nab_k(6)*(zu_L(ix,ik+6)-zu_L(ix,ik-6)))
+!    end do
+!  end do
+!
+!  return
+!END SUBROUTINE dev_k

@@ -3,10 +3,9 @@ SUBROUTINE FourieT()
   use WAVE_FUNC
   use TD_CALC
   implicit none
-  complex(kind(0d0)),dimension(:,:) :: ecur(Nbt,Ne)
-  real(8) :: peak
+  complex(kind(0d0)),dimension(:) :: ecur(Ne)
   real(8) :: ee, tt, ss
-  integer :: ie, dw, ib, jb, it
+  integer :: ie, it
 
   write(*,*)
   write(*,*) "Fourie Transform"
@@ -14,48 +13,36 @@ SUBROUTINE FourieT()
   write(*,*)"de : ", de
   write(*,*)"Ne : ", Ne
 
-  ecur(:,:)=0.d0
-  !$omp parallel do private(ie,ee,ib,it,tt,ss)
+  ecur(:)=0.d0
+  !$omp parallel do private(ie,ee,it,tt,ss)
   do ie = 1, Ne, 1
     ee = ie*de
-    do ib = 1, Nbt, 1
       do it = 1, Nt, 1
         tt = it*dt
-        ss = sum(cur(1:ib,it))
-        ecur(ib,ie) = ecur(ib,ie) + exp(zI*tt*ee)* ss *mask(it)
+        ss = sum(cur(1:Nbt,it))/real(Nbt)
+        ecur(ie) = ecur(ie) + exp(zI*tt*ee)* ss *smoothing_t(tt)
       end do
-      ecur(ib,ie) = ecur(ib,ie)*dt/(zI*ee)
-    end do
+      ecur(ie) = ecur(ie)*dt/(zI*ee)
   end do
   !$omp end parallel do
 
-  open(9,file='./output/fts.dat')
-  do ib = 1, Nbt, 1
+  open(9,file='./fts.data')
     do ie = 1, Ne, 1
       ee = ie*de
-      write(9,'(<2>i,<3>e)') ib,ie,ee,ee*En_au,abs(ecur(ib,ie))**2/ib
+      write(9,'(<1>i,<3>e)') ie,ee,ee/omega,abs(ecur(ie))**2
     end do
-    write(9,*)""
-    write(9,*)""
-  end do
   close(9)
+contains
+  Function smoothing_t(tt)
+    implicit none
+    real(8),intent(IN) :: tt
+    real(8) :: smoothing_t
 
-  dw=int(omega/de)
-  write(*,*)"dw : ", dw
-  write(*,*)"Ne/dw : ", Ne/dw
-  open(8,file='./output/integ.dat')
-  do ib = 1, Nbt, 1
-    do jb = 1, Ne/dw-1, 2
-      peak=0.d0
-      do ie = (jb-1)*dw+1, (jb+1)*dw, 1
-        peak = peak +abs(ecur(ib,ie))**2/ib*de
-      end do
-      write(8,'(<2>i,<2>e)') ib,jb,jb*dw*de,peak
-    end do
-  write(8,*) ""
-  write(8,*) ""
+    smoothing_t=1.d0-3.d0*(tt/(Nt*dt))**2+2.d0*(tt/(Nt*dt))**3
+    !if(abs(tt)<0.5d0*pulse_tw1) then
+    !  smoothing_t=cos(pi*tt/pulse_tw1)**2
+    !end if
 
-  end do
-  close(8)
-
+    return
+  End Function smoothing_t
 END SUBROUTINE

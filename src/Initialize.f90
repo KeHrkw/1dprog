@@ -27,7 +27,8 @@ SUBROUTINE Initialize()
   allocate(dk_zu(0:Nx-1,1:Nk,0:NUMBER_THREADS-1))
 
   allocate(mask(0:Nt))
-  allocate(cur(1:Nbt,0:Nt),hav(1:Nbt,0:Nt),norm(1:Nbt,0:Nt))
+  allocate(cur(1:Nbt,0:Nt),hav(1:Nbt,0:Nt),norm(1:Nbt,0:Nt),pos(1:Nbt,0:Nt))
+  allocate(cur_kf(1:Nk,0:Nt),hav_kf(1:Nk,0:Nt))
   allocate(Et(0:Nt),At(0:Nt))
   allocate(fEj(0:Nt),cc(0:Nt))
 
@@ -112,7 +113,7 @@ SUBROUTINE Initialize()
 END SUBROUTINE Initialize
 SUBROUTINE td_init()
   use CONSTANTS
-  use WAVE_FUNC
+  use WAVE_FUNC, only: u, zu
   implicit none
   integer :: ib, ik
   do ib = 1, Nbt, 1

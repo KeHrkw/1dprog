@@ -5,13 +5,14 @@ use COEFF, only : eps
   implicit none
   integer :: iter,ik,ib
   real(8),dimension(:) :: hav_base_old(Nb),cur(Nb)
+  integer,dimension(:) :: iflag_CG_conv(1:Nk)
   !open(8,file="./log_base.log")
   hav_base_old(:)=0d0
   do iter = 1, Niter, 1
     write(*,*) "---------------------------------------"
     write(*,*) "iter=",iter
 
-    call CG_method()
+    call CG_method(iflag_CG_conv)
     !call CG_method_fix()
 
     cur(:)=0d0
@@ -41,16 +42,23 @@ use COEFF, only : eps
       write(*,*) ib,hav_base(ib),hav_base(ib)-hav_base_old(ib)
     end do
     write(*,*) "---------------------------------------"
+    if(sum(iflag_CG_conv(:))==Nk) then
+      write(*,*) "----grand state calculation converge----"
+      exit
+    end if
     hav_base_old(:)=hav_base(:)
+    iflag_CG_conv=0
   end do
   !close(8)
 
 end subroutine
-SUBROUTINE CG_method()
+SUBROUTINE CG_method(iflag_CG_conv)
   !$ use omp_lib
   use CONSTANTS
   use WAVE_FUNC
   implicit none
+  integer,dimension(:),intent(out) :: iflag_CG_conv(1:Nk)
+
   complex(8),dimension(:,:) :: gk(0:Nx-1,0:NUMBER_THREADS-1)
   complex(8),dimension(:,:) :: pk(0:Nx-1,0:NUMBER_THREADS-1)
   complex(8),dimension(:,:) :: hpk(0:Nx-1,0:NUMBER_THREADS-1)
@@ -64,6 +72,7 @@ SUBROUTINE CG_method()
   integer :: thr_id
   !$ double precision st, en
   thr_id=0
+  iflag_CG_conv=0
 
   !$ st = omp_get_wtime()
   !write(8,*) "CG method"
@@ -134,8 +143,9 @@ SUBROUTINE CG_method()
 
         !write(8,'(<3>i,<6>e,i)') ik,ib,iscf,xkxk,xkHxk,(R-hav_old),(gkgk*xkxk/(R**2)),Delta,thr_id
 
-        if(gkgk*xkxk/(R**2)<4.d-16) then
+        if(gkgk*xkxk/(R**2)<4.d-20) then
           !write(*,*) ib,ik,"Converge"
+          if(ib==Nb) iflag_CG_conv(ik)=1
           exit
         end if
 

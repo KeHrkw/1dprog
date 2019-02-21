@@ -4,7 +4,9 @@ SUBROUTINE FourieT()
   use TD_CALC
   implicit none
   complex(kind(0d0)),dimension(:) :: ecur(Ne)
-  real(8) :: ee, tt, ss
+  complex(kind(0d0)),dimension(:) :: ecur_pos(Ne)
+  real(8) :: ee, tt
+  complex(8) :: pp, ss
   integer :: ie, it
 
   write(*,*)
@@ -26,10 +28,23 @@ SUBROUTINE FourieT()
   end do
   !$omp end parallel do
 
+  ecur_pos(:)=0.d0
+  !$omp parallel do private(ie,ee,it,tt,ss)
+  do ie = 1, Ne, 1
+    ee = ie*de
+      do it = 1, Nt, 1
+        tt = it*dt
+        pp = sum(pos(1:Nbt,it))/real(Nbt)
+        ecur_pos(ie) = ecur_pos(ie) + exp(zI*tt*ee)* pp *smoothing_t(tt)
+      end do
+      ecur_pos(ie) = ecur_pos(ie)*dt
+  end do
+  !$omp end parallel do
+
   open(9,file='./fts.data')
     do ie = 1, Ne, 1
       ee = ie*de
-      write(9,'(<1>i,<3>e)') ie,ee,ee/omega,abs(ecur(ie))**2
+      write(9,'(<1>i,<4>e)') ie,ee,ee/omega,abs(ecur(ie))**2,abs(ecur_pos(ie))**2
     end do
   close(9)
 contains

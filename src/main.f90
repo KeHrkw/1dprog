@@ -45,7 +45,7 @@ PROGRAM Bloch
   write(*,*) "Nb : ",Nb
 
   !$ st = omp_get_wtime()
-    call ground_state
+    call ground_state()
   !$ en = omp_get_wtime()
   !$ print *, "Elapsed time [sec]:", en-st
 
@@ -86,7 +86,13 @@ PROGRAM Bloch
   norm(:,:)=0.d0
    cur(:,:)=0.d0
    hav(:,:)=0.d0
-
+   pos(:,:)=0.d0
+  if(iflag_plot_wf==1) then
+    open(9,file='td_wf.data',status='replace')
+    close(9)
+    open(9,file='td_kf.data',status='replace')
+    close(9)
+  end if
   do it = 0, (Nt), 1
 
     select case(igauge)
@@ -101,7 +107,11 @@ PROGRAM Bloch
 
 
     if(mod(it,1000)==0 .OR. it==(Nt) )then
-       write(*,'(<1>i,<3>e)') it,sum(norm(:,it)),sum(hav(:,it)),sum(cur(:,it))
+       write(*,'(<1>i,<3>e)') it,sum(norm(:,it)),sum(hav(:,it)),sum(real(cur(:,it)))
+    end if
+
+    if((iflag_plot_wf==1)) then
+      if(mod(it,100)==0) call plot_wf(zu(:,:,:),cur_kf(:,it),hav_kf(:,it),Et(it),At(it))
     end if
   end do
   write(*,*) "---------------------------------------"
@@ -118,7 +128,7 @@ PROGRAM Bloch
   do it = 0, (Nt), 1
     write(8,'(<1>i,<1>e)',advance='no') it, it*dt
     write(8,'(<1>e)',advance='no') sum(norm(:,it))
-    write(8,'(<3>e)',advance='no') cur(1,it), sum(cur(1:2,it))/2d0, sum(cur(1:Nbt,it))/real(Nbt)
+    write(8,'(<3>e)',advance='no') real(cur(1,it)), sum(real(cur(1:2,it)))/2d0, sum(real(cur(1:Nbt,it)))/real(Nbt)
     write(8,'(<3>e)',advance='no') hav(1,it), sum(hav(1:2,it))/2d0, sum(hav(1:Nbt,it))/real(Nbt)
     write(8,'(<2>e)',advance='no') Et(it),At(it)
     write(8,*)

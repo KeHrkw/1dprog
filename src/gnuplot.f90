@@ -102,3 +102,37 @@ close(10)
 
 call system("gnuplot ./ft_blo.plt")
 END SUBROUTINE
+SUBROUTINE plot_wf(zu,cur_kf,hav_kf,Et,At)
+  use CONSTANTS, only : Nx,Nk,Nbt,dx
+  use WAVE_FUNC, only : k
+  implicit none
+  real(8),intent(in)  ::  Et,At
+  complex(8),intent(in) :: zu(0:Nx-1,Nk,Nbt)
+  complex(8),intent(in) :: cur_kf(1:Nk), hav_kf(1:Nk)
+  complex(8)  ::  zu_ib(Nbt)
+  real(8) ::  zu_abs(Nbt),ss(Nk)
+  integer :: ix, ib, ik
+  open(9,file='td_wf.data',status='old',position='append')
+  do ix = 0, Nx-1, 1
+    do ib = 1, Nbt, 1
+      zu_ib(ib)=sum(zu(ix,1:Nk,ib))/real(Nk)
+      ss(:)=abs(zu(ix,:,ib))**2
+      zu_abs(ib)=sum(ss(:))/real(Nk)
+    end do
+    write(9,'(i,e,e,e,e)') ix,sum(zu_ib(:))/real(Nbt), sum(zu_abs(:))/real(Nbt),Et*real(ix)*dx
+  end do
+  write(9,*) ""
+  write(9,*) ""
+  close(9)
+
+  open(9,file='td_kf.data',status='old',position='append')
+  do ik = 1, Nk, 1
+    do ib = 1, Nbt, 1
+      zu_abs(ib)=sum(abs(zu(:,ik,ib))**2)*dx
+    end do
+    write(9,'(i,e,e,e,e,e)') ik,k(ik),sum(abs(zu(0,ik,:)))/real(Nbt),real(cur_kf(ik)),real(hav_kf(ik)),At*k(ik)
+  end do
+  write(9,*) ""
+  write(9,*) ""
+  close(9)
+END SUBROUTINE

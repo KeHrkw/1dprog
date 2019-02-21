@@ -22,6 +22,7 @@ MODULE CONSTANTS
   real(8),parameter :: c_light=137.03953250d0
   real(8),parameter :: En_au=27.21d0 !eV
 
+  integer,parameter :: iflag_plot_wf=1
 
   real(8) :: dx, dk
 
@@ -53,8 +54,10 @@ MODULE TD_CALC
   implicit none
   integer :: Nt
   real(8),dimension(:),allocatable  :: mask
-  real(8),dimension(:,:),allocatable  :: cur, hav
-  real(8),dimension(:,:),allocatable  ::  norm
+  real(8),dimension(:,:),allocatable  :: hav
+  real(8),dimension(:,:),allocatable  :: norm
+  complex(8),dimension(:,:),allocatable  :: pos, cur
+  complex(8),dimension(:,:),allocatable  :: cur_kf, hav_kf
   real(8),dimension(:),allocatable  :: Et, At
   real(8),dimension(:),allocatable  :: fEj,cc
 

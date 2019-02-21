@@ -7,7 +7,8 @@ SUBROUTINE Gauge_Velocity(it,At_in)
   implicit none
   integer,intent(in) :: it
   real(8),intent(in) :: At_in
-  real(8),dimension(1:Nk,Nbt) :: norm_v, hav_v, cur_v
+  real(8),dimension(1:Nk,Nbt) :: norm_v, hav_v
+  complex(8),dimension(1:Nk,Nbt) :: pos_v, cur_v
   complex(kind(0d0)) :: zcoef
   complex(kind(0d0)), dimension(:,:,:) :: czu_out(0:Nx-1,1:Nk,Nbt)
   integer, save :: iexp, ib
@@ -17,6 +18,7 @@ SUBROUTINE Gauge_Velocity(it,At_in)
   norm_v(:,:)=0.d0
   cur_v(:,:)=0.d0
   hav_v(:,:)=0.d0
+  pos_v(:,:)=0.d0
 
   !$omp parallel default(shared), private(thr_id)
   !$ thr_id=omp_get_thread_num()
@@ -53,7 +55,10 @@ SUBROUTINE Gauge_Velocity(it,At_in)
       czu_out(:,ik,ib)=czu(:,thr_id)
       norm_v(ik,ib) = abs(sum(conjg(zu(:,ik,ib))*zu(:,ik,ib))*dx)
       hav_v(ik,ib) = real(sum(conjg(zu(:,ik,ib))*hzu(:,thr_id))*dx)
-      cur_v(ik,ib) = real(sum(conjg(zu(:,ik,ib))*czu(:,thr_id))*dx)
+      cur_v(ik,ib) = (sum(conjg(zu(:,ik,ib))*czu(:,thr_id))*dx)
+      do ix = 0, Nx-1, 1
+        pos_v(ik,ib) = pos_v(ik,ib)+(sum(conjg(zu(:,ik,ib))*ix*dx*zu(:,ik,ib))*dx)
+      end do
     end do
   end do
   !$omp end do
@@ -63,6 +68,10 @@ SUBROUTINE Gauge_Velocity(it,At_in)
     norm(ib,it)=sum(norm_v(:,ib))
      hav(ib,it)=sum(hav_v(:,ib))/real(Nk)
      cur(ib,it)=sum(cur_v(:,ib))/real(Nk)
+     pos(ib,it)=sum(pos_v(:,ib))/real(Nk)
   end do
-
+  do ik = 1, Nk, 1
+     cur_kf(ik,it)=sum(cur_v(ik,:))/real(Nbt)
+     hav_kf(ik,it)=sum(hav_v(ik,:))/real(Nbt)
+  end do
 END SUBROUTINE
